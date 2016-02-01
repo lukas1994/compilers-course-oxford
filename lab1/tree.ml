@@ -3,7 +3,7 @@
 type ident = string
 
 (* |name| -- type for applied occurrences, with annotations *)
-type name = 
+type name =
   { x_name: ident;              (* Name of the reference *)
     x_lab: string;              (* Global label *)
     x_line: int }               (* Line number *)
@@ -14,19 +14,20 @@ let make_name x ln = { x_name = x; x_lab = "_" ^ x; x_line = ln }
 (* Abstract syntax *)
 type program = Program of stmt
 
-and stmt = 
-    Skip 
+and stmt =
+    Skip
   | Seq of stmt list
   | Assign of name * expr
   | Print of expr
   | Newline
   | IfStmt of expr * stmt * stmt
   | WhileStmt of expr * stmt
+  | RepeatStmt of stmt * expr
 
-and expr = 
-    Number of int 
+and expr =
+    Number of int
   | Variable of name
-  | Monop of Keiko.op * expr 
+  | Monop of Keiko.op * expr
   | Binop of Keiko.op * expr * expr
 
 let seq =
@@ -52,30 +53,30 @@ let fName x = fStr x.x_name
 
 let rec fExpr =
   function
-      Number n -> 
+      Number n ->
         fMeta "Number_$" [fNum n]
-    | Variable x -> 
+    | Variable x ->
         fMeta "Variable_\"$\"" [fName x]
-    | Monop (w, e1) -> 
+    | Monop (w, e1) ->
         fMeta "Monop_($, $)" [fStr (Keiko.op_name w); fExpr e1]
-    | Binop (w, e1, e2) -> 
+    | Binop (w, e1, e2) ->
         fMeta "Binop_($, $, $)" [fStr (Keiko.op_name w); fExpr e1; fExpr e2]
 
 let rec fStmt =
   function
-      Skip -> 
+      Skip ->
         fStr "Skip"
-    | Seq ss -> 
+    | Seq ss ->
         fMeta "Seq_$" [fList(fStmt) ss]
-    | Assign (x, e) -> 
+    | Assign (x, e) ->
         fMeta "Assign_(\"$\", $)" [fName x; fExpr e]
-    | Print e -> 
+    | Print e ->
         fMeta "Print_($)" [fExpr e]
-    | Newline -> 
+    | Newline ->
         fStr "Newline"
     | IfStmt (e, s1, s2) ->
         fMeta "IfStmt_($, $, $)" [fExpr e; fStmt s1; fStmt s2]
-    | WhileStmt (e, s) -> 
+    | WhileStmt (e, s) ->
         fMeta "WhileStmt_($, $)" [fExpr e; fStmt s]
 (*
     | RepeatStmt (s, e) ->
@@ -85,9 +86,9 @@ let rec fStmt =
     | ExitStmt ->
         fStr "Exit"
     | CaseStmt (e, cases, elsept) ->
-        let fArm (labs, body) = 
+        let fArm (labs, body) =
           fMeta "($, $)" [fList(fNum) labs; fStmt body] in
-        fMeta "CaseStmt_($, $, $)" 
+        fMeta "CaseStmt_($, $, $)"
           [fExpr e; fList(fArm) cases; fStmt elsept]
 *)
     | _ ->
@@ -95,4 +96,3 @@ let rec fStmt =
         fStr "???"
 
 let print_tree fp (Program s) = fgrindf fp "" "$" [fStmt s]
-

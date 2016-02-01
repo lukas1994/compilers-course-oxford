@@ -49,13 +49,16 @@ let rec gen_stmt =
         SEQ [CONST 0; GLOBAL "Lib.Newline"; PCALL 0]
     | IfStmt (test, thenpt, elsept) ->
         let lab1 = label () and lab2 = label () and lab3 = label () in
-        SEQ [gen_cond lab1 lab2 test; 
+        SEQ [gen_cond lab1 lab2 test;
           LABEL lab1; gen_stmt thenpt; JUMP lab3;
           LABEL lab2; gen_stmt elsept; LABEL lab3]
     | WhileStmt (test, body) ->
         let lab1 = label () and lab2 = label () and lab3 = label () in
-        SEQ [JUMP lab2; LABEL lab1; gen_stmt body; 
+        SEQ [JUMP lab2; LABEL lab1; gen_stmt body;
           LABEL lab2; gen_cond lab1 lab3 test; LABEL lab3]
+    | RepeatStmt (body, test) ->
+        let lab1 = label () and lab2 = label () in
+        SEQ [LABEL lab1; gen_stmt body; gen_cond lab2 lab1 test; LABEL lab2]
 
 (* |translate| -- generate code for the whole program *)
 let translate (Program ss) =

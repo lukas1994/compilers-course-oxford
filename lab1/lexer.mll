@@ -23,7 +23,8 @@ let kwtable =
       ("newline", NEWLINE); ("and", MULOP And); ("div", MULOP Div);
       ("or", ADDOP Or); ("not", MONOP Not); ("mod", MULOP Mod);
       ("repeat", REPEAT); ("until", UNTIL);
-      ("loop", LOOP); ("exit", EXIT) ]
+      ("loop", LOOP); ("exit", EXIT);
+      ("case", CASE); ("of", OF) ]
 
 (* |idtable| -- table of all identifiers seen so far *)
 let idtable = Hashtbl.create 64
@@ -65,6 +66,7 @@ rule token =
     | "(*"              { comment lexbuf; token lexbuf }
     | "\n"              { incr lineno; Source.note_line !lineno lexbuf;
                           token lexbuf }
+    | "|"               { VBAR }
     | _                 { BADTOK }
     | eof               { EOF }
 

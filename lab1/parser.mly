@@ -13,7 +13,7 @@ open Tree
 %token                  SEMI DOT COLON LPAR RPAR COMMA MINUS VBAR
 %token                  ASSIGN EOF BADTOK
 %token                  BEGIN DO ELSE END IF THEN WHILE PRINT NEWLINE
-%token                  REPEAT UNTIL LOOP EXIT
+%token                  REPEAT UNTIL LOOP EXIT CASE OF VBAR
 
 %type <Tree.program>    program
 
@@ -31,6 +31,16 @@ stmt_list :
     stmt                                { [$1] }
   | stmt SEMI stmt_list                 { $1 :: $3 } ;
 
+number_list :
+    NUMBER                              { [$1] }
+  | number_list COMMA NUMBER            { $3 :: $1 } /* reversed */
+non_empty_case_list :
+  | number_list COLON stmts                { [($1, $3)] }
+  | number_list COLON stmts VBAR case_list { ($1, $3) :: $5 }
+case_list :
+    /* empty */                            { [] }
+  | non_empty_case_list                    { $1 }
+
 stmt :
     /* empty */                         { Skip }
   | name ASSIGN expr                    { Assign ($1, $3) }
@@ -41,7 +51,9 @@ stmt :
   | WHILE expr DO stmts END             { WhileStmt ($2, $4) }
   | REPEAT stmts UNTIL expr             { RepeatStmt ($2, $4) }
   | LOOP stmts END                      { LoopStmt $2 }
-  | EXIT                                { Exit } ;
+  | EXIT                                { Exit }
+  | CASE expr OF case_list END             { CaseStmt ($2, $4, Skip)}
+  | CASE expr OF case_list ELSE stmts END  { CaseStmt ($2, $4, $6)} ;
 
 expr :
     simple                              { $1 }

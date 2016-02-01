@@ -25,6 +25,7 @@ and stmt =
   | RepeatStmt of stmt * expr
   | LoopStmt of stmt
   | Exit
+  | CaseStmt of expr * (int list * stmt) list * stmt
 
 and expr =
     Number of int

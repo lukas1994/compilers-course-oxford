@@ -2,6 +2,7 @@
 
 open Tree
 open Keiko
+open Print
 
 let optflag = ref false
 
@@ -64,6 +65,15 @@ let rec gen_stmt s exit_lab =
         let lab = label () and exit_lab = label () in
         SEQ [LABEL lab; gen_stmt body exit_lab; JUMP lab; LABEL exit_lab]
     | Exit -> JUMP exit_lab
+    | CaseStmt (switch, cases, default) ->
+        let case_labs = List.map (fun _ -> label ()) cases and def_lab = label () and case_exit_lab = label () in
+        let l = List.concat (List.map (fun ((nums, code), l) -> List.map (fun n -> (n, l)) nums) (List.combine cases case_labs)) in
+        SEQ [gen_expr switch;
+          CASEJUMP (List.length l); SEQ (List.map (fun (n, l) -> CASEARM (n, l)) l); JUMP def_lab;
+          SEQ (List.map (fun ((_, code), l) ->
+            SEQ [LABEL l; gen_stmt code exit_lab; JUMP case_exit_lab]
+          ) (List.combine cases case_labs));
+          LABEL def_lab; gen_stmt default exit_lab; LABEL case_exit_lab]
 
 (* |translate| -- generate code for the whole program *)
 let translate (Program ss) =

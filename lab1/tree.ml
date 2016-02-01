@@ -23,6 +23,8 @@ and stmt =
   | IfStmt of expr * stmt * stmt
   | WhileStmt of expr * stmt
   | RepeatStmt of stmt * expr
+  | LoopStmt of stmt
+  | Exit
 
 and expr =
     Number of int

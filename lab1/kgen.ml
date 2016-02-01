@@ -37,10 +37,10 @@ let rec gen_cond tlab flab e =
         SEQ [gen_expr e; CONST 0; JUMPC (Neq, tlab); JUMP flab]
 
 (* |gen_stmt| -- generate code for a statement *)
-let rec gen_stmt =
-  function
+let rec gen_stmt s exit_lab =
+  match s with
       Skip -> NOP
-    | Seq stmts -> SEQ (List.map gen_stmt stmts)
+    | Seq stmts -> SEQ (List.map (fun s -> gen_stmt s exit_lab) stmts)
     | Assign (v, e) ->
         SEQ [LINE v.x_line; gen_expr e; STGW v.x_lab]
     | Print e ->
@@ -50,17 +50,23 @@ let rec gen_stmt =
     | IfStmt (test, thenpt, elsept) ->
         let lab1 = label () and lab2 = label () and lab3 = label () in
         SEQ [gen_cond lab1 lab2 test;
-          LABEL lab1; gen_stmt thenpt; JUMP lab3;
-          LABEL lab2; gen_stmt elsept; LABEL lab3]
+          LABEL lab1; gen_stmt thenpt exit_lab; JUMP lab3;
+          LABEL lab2; gen_stmt elsept exit_lab; LABEL lab3]
     | WhileStmt (test, body) ->
         let lab1 = label () and lab2 = label () and lab3 = label () in
-        SEQ [JUMP lab2; LABEL lab1; gen_stmt body;
+        SEQ [JUMP lab2; LABEL lab1; gen_stmt body exit_lab;
           LABEL lab2; gen_cond lab1 lab3 test; LABEL lab3]
     | RepeatStmt (body, test) ->
         let lab1 = label () and lab2 = label () in
-        SEQ [LABEL lab1; gen_stmt body; gen_cond lab2 lab1 test; LABEL lab2]
+        SEQ [LABEL lab1; gen_stmt body exit_lab;
+          gen_cond lab2 lab1 test; LABEL lab2]
+    | LoopStmt body ->
+        let lab = label () and exit_lab = label () in
+        SEQ [LABEL lab; gen_stmt body exit_lab; JUMP lab; LABEL exit_lab]
+    | Exit -> JUMP exit_lab
 
 (* |translate| -- generate code for the whole program *)
 let translate (Program ss) =
-  let code = gen_stmt ss in
+  let lab = label () in
+  let code = gen_stmt ss lab in
   Keiko.output (if !optflag then Peepopt.optimise code else code)

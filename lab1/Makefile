@@ -1,7 +1,7 @@
 # lab1/Makefile
 
 ## Add your own test cases to this list
-TEST = gcd repeat loop case
+TEST = gcd repeat loop case lab1
 
 all: ppc
 

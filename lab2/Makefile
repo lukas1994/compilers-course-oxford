@@ -1,7 +1,7 @@
 # lab2/Makefile
 
 ## Add your own test cases to this list
-TEST = gcd array pascal binary
+TEST = gcd array pascal binary test
 
 all: ppc
 
@@ -33,7 +33,7 @@ realclean: clean
 
 clean: force
 	rm -f ppc ppx ppxj *.cma *.cmo *.cmi *.o
-	rm -f parser.mli parser.ml lexer.ml 
+	rm -f parser.mli parser.ml lexer.ml
 	rm -f a.k a.out a.x a.test
 
 ML = check.ml check.mli dict.ml dict.mli keiko.ml keiko.mli kgen.ml \

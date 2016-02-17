@@ -102,7 +102,7 @@ let ruleset replace =
         replace 2 []
     | CONST a :: CONST b :: BINOP Times :: _ ->
         replace 3 [CONST (a*b)]
-    | CONST a :: BINOP PlusA :: CONST b :: _ ->
+    | CONST a :: CONST b :: BINOP PlusA :: _ ->
         replace 3 [CONST (a+b)]
 
     | _ -> ()

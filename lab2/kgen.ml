@@ -72,8 +72,8 @@ let rec gen_stmt =
     | Seq stmts -> SEQ (List.map gen_stmt stmts)
     | Assign (v, e) ->
         let t = e.e_type in
-        let t' = if is_array t then base_type t else t in
-        let store_instr = if t' == Boolean then STOREW else STOREW in
+        if is_array t then failwith "gen_stmt";
+        let store_instr = if t == Boolean then STOREC else STOREW in
         SEQ [LINE (line_number v); gen_expr e; gen_addr v; store_instr]
     | Print e ->
         SEQ [gen_expr e; CONST 0; GLOBAL "Lib.Print"; PCALL 1]

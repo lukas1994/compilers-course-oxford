@@ -1,9 +1,9 @@
 (* lab2/check.ml *)
 
-open Print 
+open Print
 open Keiko
-open Tree 
-open Dict 
+open Tree
+open Dict
 
 (* |err_line| -- line number for error messages *)
 let err_line = ref 1
@@ -12,18 +12,18 @@ let err_line = ref 1
 exception Semantic_error of string * Print.arg list * int
 
 (* |sem_error| -- issue error message by raising exception *)
-let sem_error fmt args = 
+let sem_error fmt args =
   raise (Semantic_error (fmt, args, !err_line))
 
 (* |lookup_def| -- find definition of a name, give error is none *)
 let lookup_def x env =
   err_line := x.x_line;
-  try let d = lookup x.x_name env in x.x_def <- Some d; d.d_type with 
+  try let d = lookup x.x_name env in x.x_def <- Some d; d.d_type with
     Not_found -> sem_error "$ is not declared" [fStr x.x_name]
 
 (* |add_def| -- add definition to env, give error if already declared *)
 let add_def d env =
-  try define d env with 
+  try define d env with
     Exit -> sem_error "$ is already declared" [fStr d.d_tag]
 
 (* |type_error| -- report a type error.  The message could be better. *)
@@ -60,17 +60,21 @@ let rec check_expr env e =
   (e.e_type <- t; t)
 
 (* |expr_type| -- check an expression and return its type *)
-and expr_type env e = 
+and expr_type env e =
   match e.e_guts with
-      Variable x -> 
+      Variable x ->
         lookup_def x env
-    | Sub (e1, e2) ->
-        failwith "subscripts not implemented"
+    | Sub (v, e) ->
+        let vt = check_expr env v
+        and et = check_expr env e in
+        if not (is_array v.e_type) then type_error ();
+        if et <> Integer then type_error ();
+        base_type vt
     | Number n -> Integer
-    | Monop (w, e1) -> 
+    | Monop (w, e1) ->
         let t = check_expr env e1 in
         check_monop w t
-    | Binop (w, e1, e2) -> 
+    | Binop (w, e1, e2) ->
         let ta = check_expr env e1
         and tb = check_expr env e2 in
         check_binop w ta tb
@@ -84,6 +88,7 @@ let rec check_stmt env =
     | Assign (lhs, rhs) ->
         let ta = check_expr env lhs
         and tb = check_expr env rhs in
+        if is_array ta then sem_error "cannot assign to array" [];
         if ta <> tb then sem_error "type mismatch in assignment" []
     | Print e ->
         let t = check_expr env e in
@@ -94,7 +99,7 @@ let rec check_stmt env =
         let t = check_expr env cond in
         if t <> Boolean then
           sem_error "boolean needed in if statement" [];
-        check_stmt env thenpt; 
+        check_stmt env thenpt;
         check_stmt env elsept
     | WhileStmt (cond, body) ->
         let t = check_expr env cond in
@@ -107,7 +112,7 @@ let make_def x t a = { d_tag = x; d_type = t; d_lab = a }
 
 (* |check_decl| -- check declaration and return extended environment *)
 let check_decl env0 (Decl (vs, t)) =
-  let declare env x = 
+  let declare env x =
     let lab = sprintf "_$" [fStr x.x_name] in
     let d = make_def x.x_name t lab in
     x.x_def <- Some d; add_def d env in
@@ -120,5 +125,3 @@ let check_decls = List.fold_left check_decl
 let annotate (Program (ds, ss)) =
   let env = check_decls init_env ds in
   check_stmt env ss
-
-

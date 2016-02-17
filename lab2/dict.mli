@@ -2,14 +2,23 @@
 
 type ident = string
 
-type ptype = 
-    Integer 
-  | Boolean 
+type ptype =
+    Integer
+  | Boolean
   | Array of int * ptype
   | Void
 
+(* |type_size| -- calculate the size of a type *)
+val type_size : ptype -> int
+
+(* |is_array| -- returns true iff the given type is an array *)
+val is_array : ptype -> bool
+
+(* |base_type| -- returns the base type of an array; throws an exception if the given type is not an array*)
+val base_type : ptype -> ptype
+
 (* |def| -- definitions in environment *)
-type def = 
+type def =
   { d_tag: ident;               (* Name *)
     d_type: ptype;              (* Type *)
     d_lab: string }             (* Global label *)

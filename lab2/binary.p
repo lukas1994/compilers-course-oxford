@@ -1,4 +1,4 @@
-var n, v, w, k: integer; 
+var n, v, w, k: integer;
 var d: array 32 of boolean;
 
 begin

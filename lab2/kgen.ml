@@ -36,9 +36,12 @@ and gen_addr v =
       Variable x ->
         let d = get_def x in
         SEQ [LINE x.x_line; GLOBAL d.d_lab]
-    | Sub (v, e) ->
-        let ts = type_size (base_type v.e_type) in
-        SEQ [gen_addr v; gen_expr e; CONST ts; BINOP Times; BINOP PlusA]
+    | Sub (a, e) ->
+        (match a.e_type with
+            Array (n, _) ->
+              let ts = type_size (base_type a.e_type) in
+              SEQ [gen_addr a; gen_expr e; CONST n; BOUND (line_number v); CONST ts; BINOP Times; BINOP PlusA]
+          | _ -> failwith "gen_addr array")
     | _ ->
         failwith "gen_addr"
 

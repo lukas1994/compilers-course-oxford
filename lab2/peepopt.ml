@@ -7,7 +7,7 @@ let debug = ref 0
 
 (* Disjoint sets of labels *)
 
-type lab_data = 
+type lab_data =
     LabDef of labrec                    (* An extant label *)
   | Equiv of codelab                    (* A label that's been merged *)
 
@@ -78,7 +78,7 @@ let ruleset replace =
         replace 4 [CONST (a+b); BINOP PlusA]
     | CONST 0 :: BINOP PlusA :: _ ->
         replace 2 []
-     
+
     | LINE n :: LABEL a :: _ ->
         replace 2 [LABEL a; LINE n]
     | LINE n :: LINE m :: _ ->
@@ -91,12 +91,19 @@ let ruleset replace =
         replace 2 [JUMPC (opposite w, b)]
     | JUMP a :: LABEL b :: _ when same_lab a b ->
         replace 1 []
-    | JUMP a :: LABEL b :: _ -> 
+    | JUMP a :: LABEL b :: _ ->
         ()
     | JUMP a :: _ :: _ ->
         replace 2 [JUMP a]
     | LABEL a :: _ when !(ref_count a) = 0 ->
         replace 1 []
+
+    | CONST 1 :: BINOP Times :: _ ->
+        replace 2 []
+    | CONST a :: CONST b :: BINOP Times :: _ ->
+        replace 3 [CONST (a*b)]
+    | CONST a :: BINOP PlusA :: CONST b :: _ ->
+        replace 3 [CONST (a+b)]
 
     | _ -> ()
 
@@ -115,12 +122,12 @@ let rec drop n =
 (* |optstep| -- apply rules at one place in the buffer *)
 let optstep rules changed code =
   let ch = ref true in
-  let replace n c = 
+  let replace n c =
     changed := true; ch := true;
   if !debug > 0 then
       printf "! $ --> $\n" [fList(fInst) (take n !code); fList(fInst) c];
     List.iter (do_refs decr) (take n !code);
-    List.iter (do_refs incr) c; 
+    List.iter (do_refs incr) c;
     code := c @ drop n !code in
   while !ch do
     ch := false; rules replace !code

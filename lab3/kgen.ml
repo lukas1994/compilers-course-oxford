@@ -1,9 +1,9 @@
 (* lab3/kgen.ml *)
 
-open Tree 
-open Dict 
-open Keiko 
-open Print 
+open Tree
+open Dict
+open Keiko
+open Print
 
 let optflag = ref false
 
@@ -11,12 +11,22 @@ let level = ref 0
 
 let slink = 12
 
+let get_slink d = (!level - d.d_level + 1) * slink
+
+(* |gen_addr_lvl| -- generate code to push address of a variable *)
+let rec gen_addr_lvl lvl d =
+  if lvl  = d.d_level then
+    CONST d.d_off
+  else
+    SEQ [CONST slink; BINOP PlusA; LOADW; gen_addr_lvl (lvl - 1) d]
+
+
 (* |gen_addr| -- generate code to push address of a variable *)
 let gen_addr d =
-  if d.d_level = 0 then
+  if d.d_level = 0 || d.d_off = 0 then
     GLOBAL d.d_lab
   else
-    failwith "local variables not implemented yet"
+    SEQ [LOCAL 0; gen_addr_lvl (!level) d; BINOP Plus]
 
 (* |gen_expr| -- generate code for an expression *)
 let rec gen_expr =
@@ -27,7 +37,7 @@ let rec gen_expr =
           match d.d_kind with
               VarDef ->
                 SEQ [LINE x.x_line; gen_addr d; LOADW]
-            | ProcDef nargs -> 
+            | ProcDef nargs ->
                 failwith "no procedure values"
         end
     | Number x ->
@@ -37,8 +47,11 @@ let rec gen_expr =
     | Binop (w, e1, e2) ->
         SEQ [gen_expr e1; gen_expr e2; BINOP w]
     | Call (p, args) ->
-        SEQ [LINE p.x_line;
-          failwith "no procedure call"]
+        SEQ [LINE p.x_line; SEQ (List.map gen_expr (List.rev args));
+          LOCAL (get_slink (get_def p)); (* static link *)
+          gen_addr (get_def p);
+          PCALLW (List.length args)
+        ]
 
 (* |gen_cond| -- generate code for short-circuit condition *)
 let rec gen_cond tlab flab e =
@@ -80,15 +93,15 @@ let rec gen_stmt =
         SEQ [CONST 0; GLOBAL "Lib.Newline"; PCALL 0]
     | IfStmt (test, thenpt, elsept) ->
         let lab1 = label () and lab2 = label () and lab3 = label () in
-        SEQ [gen_cond lab1 lab2 test; 
+        SEQ [gen_cond lab1 lab2 test;
           LABEL lab1; gen_stmt thenpt; JUMP lab3;
           LABEL lab2; gen_stmt elsept; LABEL lab3]
     | WhileStmt (test, body) ->
         let lab1 = label () and lab2 = label () and lab3 = label () in
-        SEQ [JUMP lab2; LABEL lab1; gen_stmt body; 
+        SEQ [JUMP lab2; LABEL lab1; gen_stmt body;
           LABEL lab2; gen_cond lab1 lab3 test; LABEL lab3]
     | Return e ->
-        failwith "no return statement"
+        SEQ [gen_expr e; RETURNW]
 
 (* |gen_proc| -- generate code for a procedure *)
 let rec gen_proc (Proc (p, formals, Block (vars, procs, body))) =

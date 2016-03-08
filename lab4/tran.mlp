@@ -13,6 +13,7 @@ let release =
       Register reg -> release_reg reg
     | Index (reg, off) -> release_reg reg
     | Index2 (r1, r2, n) -> release_reg r1; release_reg r2
+    | Shift (reg, _) -> release_reg reg
     | _ -> ()
 
 let fix_reg r = Register (get_reg (reg_of r))
@@ -93,7 +94,7 @@ let rec e_reg r t =
     rr in
 
   match t with
-      <CONST k> when fits_move k -> 
+      <CONST k> when fits_move k ->
         gen_reg "mov" [r; Const k]
     | <CONST k> ->
         gen_reg "ldr" [r; Literal ("", k)]
@@ -111,10 +112,10 @@ let rec e_reg r t =
     | <(LOADW|LOADC), <REGVAR i>> ->
         let rv = List.nth stable i in
         reserve_reg rv; gen_move r (Register rv)
-    | <LOADW, t1> -> 
+    | <LOADW, t1> ->
         let v1 = e_addr t1 in
         gen_reg "ldr" [r; v1]
-    | <LOADC, t1> -> 
+    | <LOADC, t1> ->
         let v1 = e_addr t1 in
         gen_reg "ldrb" [r; v1]
     | <PCALL _, _> ->
@@ -122,7 +123,7 @@ let rec e_reg r t =
         reserve_reg (R 0); gen_move r (Register (R 0))
 
     | <MONOP Uminus, t1> -> unary "neg" t1
-    | <MONOP Not, t1> -> 
+    | <MONOP Not, t1> ->
         let v1 = e_reg anyreg t1 in
         gen_reg "eor" [r; v1; Const 1]
     | <MONOP BitNot, t1> -> unary "mvn" t1
@@ -144,11 +145,19 @@ let rec e_reg r t =
     | <BINOP BitOr, t1, t2> -> binary "orr" t1 t2
 
     | <BINOP Times, t1, t2> ->
-        (* The mul instruction needs both operands in registers *)
         let v1 = e_reg anyreg t1 in
-        let v2 = e_reg anyreg t2 in
-        gen_reg "mul" [r; v1; v2]
-
+        (match t2 with
+          <CONST 3>   ->
+            reserve_reg (reg_of r);
+            gen_reg "add" [r; v1; Shift (reg_of v1, 1)]
+        | <CONST 9>   ->
+            reserve_reg (reg_of r);
+            gen_reg "add" [r; v1; Shift (reg_of v1, 3)]
+        | _ ->
+          (* The mul instruction needs both operands in registers *)
+          let v2 = e_reg anyreg t2 in
+          gen_reg "mul" [r; v1; v2]
+        )
     | <BINOP Eq, t1, t2> -> compare "moveq" t1 t2
     | <BINOP Neq, t1, t2> -> compare "movne" t1 t2
     | <BINOP Gt, t1, t2> -> compare "movgt" t1 t2
@@ -179,18 +188,29 @@ let rec e_reg r t =
 and e_rand =
   (* returns |Const| or |Register| *)
   function
-      <CONST k> when fits_immed k -> Const k
-    | t -> e_reg anyreg t 
+      <BINOP Lsl, t, <CONST n>> when n<32 ->
+        let v = e_reg anyreg t in
+        Shift (reg_of v, n)
+    | <CONST k> when fits_immed k -> Const k
+    | t -> e_reg anyreg t
 
 (* |e_addr| -- evaluate to form an address for ldr or str *)
 and e_addr =
   (* returns |Index| *)
   function
-      <LOCAL n> when fits_offset n ->
-        Index (R_fp, n) 
+      <BINOP PlusA, t1, <BINOP Lsl, t2, <CONST n>>> when n<32 ->
+        let v1 = e_reg anyreg t1 in
+        let v2 = e_reg anyreg t2 in
+        Index2 (reg_of v1, reg_of v2, n)
+    | <LOCAL n> when fits_offset n ->
+        Index (R_fp, n)
     | <BINOP PlusA, t1, <CONST n>> when fits_offset n ->
         let v1 = e_reg anyreg t1 in
         Index (reg_of v1, n)
+    | <BINOP PlusA, t1, t2> ->
+        let v1 = e_reg anyreg t1 in
+        let v2 = e_reg anyreg t2 in
+        Index2 (reg_of v1, reg_of v2, 0)
     | t ->
         let v1 = e_reg anyreg t in
         Index (reg_of v1, 0)
@@ -202,12 +222,12 @@ and e_call t =
 
   (* Call the function *)
   begin match t with
-      <PCALL n, <GLOBAL f>> -> 
+      <PCALL n, <GLOBAL f>> ->
         gen "bl" [Global f]
-    | <PCALL n, t1> -> 
+    | <PCALL n, t1> ->
         let v1 = e_reg anyreg t1 in
         gen "blx" [v1]
-    | <w, @args> -> 
+    | <w, @args> ->
         failwith (sprintf "e_call $" [fInst w])
   end;
 
@@ -232,11 +252,11 @@ let e_stmt t =
     | <(STOREW|STOREC), t1, <REGVAR i>> ->
         let rv = List.nth stable i in
         release (e_reg (Register rv) t1)
-    | <STOREW, t1, t2> -> 
+    | <STOREW, t1, t2> ->
         let v1 = e_reg anyreg t1 in
         let v2 = e_addr t2 in
         gen "str" [v1; v2]
-    | <STOREC, t1, t2> -> 
+    | <STOREC, t1, t2> ->
         let v1 = e_reg anyreg t1 in
         let v2 = e_addr t2 in
         gen "strb" [v1; v2]
@@ -290,7 +310,7 @@ let e_stmt t =
         spill_temps [r];
         ignore (e_reg (Register r) t1)
 
-    | <w, @ts> -> 
+    | <w, @ts> ->
         failwith (sprintf "e_stmt $" [fInst w])
 
 (* |process| -- generate code for a statement, or note a line number *)
@@ -309,7 +329,7 @@ let process =
 let translate lab level nargs nregv fsize code =
   Target.start_proc lab level nargs fsize;
   Regs.get_regvars nregv;
-  (try List.iter process code with exc -> 
+  (try List.iter process code with exc ->
     (* Code generation failed, but let's see how far we got *)
     Target.flush_proc (); raise exc);
   Target.end_proc ()

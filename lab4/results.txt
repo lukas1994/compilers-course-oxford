@@ -1,0 +1,6 @@
+                              | pprolog | sudoku
+------------------------------------------------
+initial                       | 4050    | 641
+opt1 (more addressing modes)  | 3922    | 618
+opt2 (shifter operands)       | 3772    | 618
+opt3 (multiplying by a const) | 3772    | 614

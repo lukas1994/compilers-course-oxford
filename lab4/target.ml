@@ -9,11 +9,11 @@ type reg = R of int | R_fp | R_sp | R_pc | R_ip | R_any | R_temp | R_none
 let reg_name =
   function
       R n -> sprintf "r$" [fNum n]
-    | R_fp -> "fp" 
+    | R_fp -> "fp"
     | R_sp -> "sp"
     | R_pc -> "pc"
-    | R_ip -> "ip"   
-    | R_any -> "*ANYREG*" 
+    | R_ip -> "ip"
+    | R_any -> "*ANYREG*"
     | R_temp -> "*TEMPREG*"
     | R_none -> "*NOREG*"
 
@@ -29,7 +29,7 @@ let fReg r = fStr (reg_name r)
    R12=sp stack pointer
    R13=ip temp for linkage
    R14=lr link register
-   R15=pc program counter 
+   R15=pc program counter
 
 *)
 
@@ -42,6 +42,7 @@ type operand =                  (* VALUE        ASM SYNTAX       *)
   | Register of reg             (* [reg]        reg              *)
   | Index of reg * int          (* [reg]+val    [reg, #val]      *)
   | Index2 of reg * reg * int   (* [r1]+[r2]<<n [r1, r2, LSL #n] *)
+  | Shift of reg * int          (* [reg]<<n     reg, LSL #n      *)
   | Literal of symbol * int     (* lab+val      =lab+val         *)
   | Global of symbol            (* lab          lab              *)
   | Label of codelab            (* lab          lab              *)
@@ -59,7 +60,12 @@ let fRand =
           fMeta "[$, $]" [fReg r1; fReg r2]
         else
           fMeta "[$, $, LSL #$]" [fReg r1; fReg r2; fNum n]
-    | Literal (lab, off) -> 
+    | Shift (reg, n) ->
+        if n = 0 then
+          fReg reg
+        else
+          fMeta "$, LSL #$" [fReg reg; fNum n]
+    | Literal (lab, off) ->
         if lab = "" then fMeta "=$" [fNum off]
         else if off = 0 then fMeta "=$" [fStr lab]
         else if off > 0 then fMeta "=$+$" [fStr lab; fNum off]
@@ -68,7 +74,7 @@ let fRand =
     | Label lab -> fMeta ".$" [fLab lab]
 
 (* |reg_of| -- extract register (or R_none) from operand *)
-let reg_of = 
+let reg_of =
   function
       Register reg -> reg
     | _ -> failwith "reg_of"
@@ -82,8 +88,8 @@ let current_seg = ref Unknown
 (* |segment| -- emit segment directive if needed *)
 let segment s =
   if !current_seg <> s then begin
-    let seg_name = 
-      match s with 
+    let seg_name =
+      match s with
         Text -> ".text" | Data -> ".data" | Unknown -> "*unknown*" in
     printf "\t$\n" [fStr seg_name];
     current_seg := s
@@ -94,8 +100,8 @@ let preamble () =
   printf "@ picoPascal compiler output\n" [];
   printf "\t.global pmain\n\n" []
 
-type item = 
-    Instr of string * operand list 
+type item =
+    Instr of string * operand list
   | Label of codelab
   | Comment of string
   | Tree of Keiko.optree
@@ -130,14 +136,14 @@ let need_stack n =
 let flush () =
   let put =
     function
-        Instr (inst, []) -> 
+        Instr (inst, []) ->
           printf "\t$\n" [fStr inst]
       | Instr (inst, rands) ->
           printf "\t$ $\n" [fStr inst; fList(fRand) rands]
       | Label lab ->
-          printf ".$:\n" [fLab lab] 
+          printf ".$:\n" [fLab lab]
       | Comment cmnt ->
-          printf "@ $\n" [fStr cmnt] 
+          printf "@ $\n" [fStr cmnt]
       | Tree t ->
           Keiko.print_optree "@ " t in
   Queue.iter put code;
@@ -184,7 +190,7 @@ let emit_string lab s =
   let n = String.length s in
   for k = 0 to n-1 do
     let c = int_of_char s.[k] in
-    if k mod 10 = 0 then 
+    if k mod 10 = 0 then
       printf "\n\t.byte $" [fNum c]
     else
       printf ", $" [fNum c]
@@ -199,4 +205,3 @@ let emit_global lab n =
 let postamble () =
   fprintf stderr "$ instructions\n" [fNum !icount];
   printf "@ End\n" []
-

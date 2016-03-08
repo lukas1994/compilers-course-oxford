@@ -18,6 +18,7 @@ let rec gen_addr_lvl lvl d =
   if lvl  = d.d_level then
     CONST d.d_off
   else
+    (* follow static links *)
     SEQ [CONST slink; BINOP PlusA; LOADW; gen_addr_lvl (lvl - 1) d]
 
 

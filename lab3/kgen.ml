@@ -43,8 +43,8 @@ let rec gen_expr =
           match d.d_kind with
               VarDef ->
                 SEQ [LINE x.x_line; gen_addr d; LOADW]
-            | ProcDef nargs ->
-                failwith "no procedure values"
+            | ProcDef _ ->
+                SEQ [LINE x.x_line; get_slink d; gen_addr d; PACK]
         end
     | Number x ->
         CONST x
@@ -53,11 +53,18 @@ let rec gen_expr =
     | Binop (w, e1, e2) ->
         SEQ [gen_expr e1; gen_expr e2; BINOP w]
     | Call (p, args) ->
-        SEQ [LINE p.x_line; SEQ (List.map gen_expr (List.rev args));
-          get_slink (get_def p); (* static link *)
-          gen_addr (get_def p);
-          PCALLW (List.length args)
-        ]
+        let d = get_def p in
+        let prep = SEQ [LINE p.x_line; SEQ (List.map gen_expr (List.rev args))] in
+        begin
+          match d.d_kind with
+            VarDef ->
+              SEQ [prep; gen_addr d; LOADW; UNPACK; PCALLW (List.length args)]
+          | ProcDef _ ->
+              SEQ [prep;
+                   get_slink d; (* static link *)
+                   gen_addr d;
+                   PCALLW (List.length args)]
+        end
 
 (* |gen_cond| -- generate code for short-circuit condition *)
 let rec gen_cond tlab flab e =

@@ -11,23 +11,28 @@ let level = ref 0
 
 let slink = 12
 
-let get_slink d = (!level - d.d_level + 1) * slink
+(* |get_slink_rec| -- helper for get_slink *)
+let rec get_slink_rec lvl d =
+  if lvl = d.d_level - 1 then SEQ []
+  else SEQ [CONST slink; BINOP PlusA; LOADW; get_slink_rec (lvl - 1) d]
 
-(* |gen_addr_lvl| -- generate code to push address of a variable *)
-let rec gen_addr_lvl lvl d =
+(* |get_slink| -- calculate static link *)
+let get_slink d =
+  SEQ [LOCAL 0; get_slink_rec (!level) d]
+
+(* |gen_addr_rec| -- helper for gen_addr *)
+let rec gen_addr_rec lvl d=
   if lvl  = d.d_level then
     CONST d.d_off
   else
-    (* follow static links *)
-    SEQ [CONST slink; BINOP PlusA; LOADW; gen_addr_lvl (lvl - 1) d]
-
+    SEQ [CONST slink; BINOP PlusA; LOADW; gen_addr_rec (lvl - 1) d]
 
 (* |gen_addr| -- generate code to push address of a variable *)
 let gen_addr d =
   if d.d_level = 0 || d.d_off = 0 then
     GLOBAL d.d_lab
   else
-    SEQ [LOCAL 0; gen_addr_lvl (!level) d; BINOP Plus]
+    SEQ [LOCAL 0; gen_addr_rec (!level) d; BINOP PlusA]
 
 (* |gen_expr| -- generate code for an expression *)
 let rec gen_expr =
@@ -49,7 +54,7 @@ let rec gen_expr =
         SEQ [gen_expr e1; gen_expr e2; BINOP w]
     | Call (p, args) ->
         SEQ [LINE p.x_line; SEQ (List.map gen_expr (List.rev args));
-          LOCAL (get_slink (get_def p)); (* static link *)
+          get_slink (get_def p); (* static link *)
           gen_addr (get_def p);
           PCALLW (List.length args)
         ]
